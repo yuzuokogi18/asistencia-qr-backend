@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum RolUsuario {
+  admin
+  operador
+}
+
+enum Turno {
+  matutino
+  vespertino
+}
+
+enum EstatusAsistencia {
+  a_tiempo
+  retardo
+  sin_salida
+  falta
+}
+
+enum TipoAlerta {
+  falta_injustificada
+  retardo
+  salida_anticipada
+}
+
+model Usuario {
+  id            Int         @id @default(autoincrement())
+  nombre        String      @db.VarChar(120)
+  usuario       String      @unique @db.VarChar(60)
+  password_hash String      @db.VarChar(255)
+  rol           RolUsuario  @default(operador)
+  activo        Boolean     @default(true)
+  created_at    DateTime    @default(now())
+
+  @@map("usuarios")
+}
+
+model Grupo {
+  id                    Int       @id @default(autoincrement())
+  nombre                String    @db.VarChar(50)
+  grado                 String    @db.VarChar(50)
+  turno                 Turno     @default(matutino)
+  ciclo_escolar         String    @db.VarChar(30)
+  hora_inicio_entrada   String?   @db.VarChar(8) // Formato "HH:mm:ss", ej: "08:00:00"
+  hora_limite_entrada   String    @db.VarChar(8) // Formato "HH:mm:ss", ej: "09:00:00"
+  hora_inicio_salida    String?   @db.VarChar(8) // Formato "HH:mm:ss", ej: "13:00:00"
+  hora_esperada_salida  String    @db.VarChar(8) // Formato "HH:mm:ss", ej: "14:00:00"
+  tiene_segundo_horario Boolean   @default(false)
+  hora_inicio_entrada2  String?   @db.VarChar(8) // Formato "HH:mm:ss", ej: "15:00:00"
+  hora_limite_entrada2  String?   @db.VarChar(8) // Formato "HH:mm:ss", ej: "16:00:00"
+  hora_inicio_salida2   String?   @db.VarChar(8) // Formato "HH:mm:ss", ej: "18:00:00"
+  hora_esperada_salida2 String?   @db.VarChar(8) // Formato "HH:mm:ss", ej: "19:00:00"
+  activo                Boolean   @default(true)
+  created_at            DateTime  @default(now())
+
+  alumnos Alumno[]
+  alertas Alerta[]
+
+  @@map("grupos")
+}
+
+model Alumno {
+  id               Int       @id @default(autoincrement())
+  matricula        String    @unique @db.VarChar(30)
+  nombre           String    @db.VarChar(80)
+  apellido_paterno String    @db.VarChar(80)
+  apellido_materno String    @db.VarChar(80)
+  grupo_id         Int
+  activo           Boolean   @default(true)
+  created_at       DateTime  @default(now())
+
+  grupo       Grupo        @relation(fields: [grupo_id], references: [id], onDelete: Restrict)
+  asistencias Asistencia[]
+  alertas     Alerta[]
+
+  @@index([grupo_id])
+  @@map("alumnos")
+}
+
+model Asistencia {
+  id           Int               @id @default(autoincrement())
+  alumno_id    Int
+  fecha        DateTime          @db.Date
+  hora_entrada String?           @db.VarChar(8) // Formato "HH:mm:ss", ej: "07:10:45"
+  hora_salida  String?           @db.VarChar(8) // Formato "HH:mm:ss", ej: "14:02:10"
+  estatus      EstatusAsistencia @default(a_tiempo)
+  created_at   DateTime          @default(now())
+
+  alumno Alumno @relation(fields: [alumno_id], references: [id], onDelete: Cascade)
+
+  @@unique([alumno_id, fecha])
+  @@index([alumno_id, fecha])
+  @@map("asistencias")
+}
+
+model Alerta {
+  id          Int        @id @default(autoincrement())
+  alumno_id   Int
+  grupo_id    Int
+  tipo        TipoAlerta
+  fecha_hora  DateTime   @default(now())
+  descripcion String     @db.VarChar(255)
+  resuelta    Boolean    @default(false)
+  created_at  DateTime   @default(now())
+
+  alumno Alumno @relation(fields: [alumno_id], references: [id], onDelete: Cascade)
+  grupo  Grupo  @relation(fields: [grupo_id], references: [id], onDelete: Cascade)
+
+  @@index([fecha_hora])
+  @@index([alumno_id])
+  @@index([grupo_id])
+  @@map("alertas")
+}
