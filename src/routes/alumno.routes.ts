@@ -8,8 +8,8 @@ const router = Router();
 // Búsqueda rápida de alumno por nombre o matrícula (para dashboard)
 router.get('/buscar', authenticate, AlumnoController.buscarAlumnos);
 
-// Generar y descargar/visualizar código QR del alumno como imagen PNG
-router.get('/:matricula/qr', authenticate, AlumnoController.generarQr);
+// Generar y descargar/visualizar código QR del alumno como imagen PNG (público para credenciales)
+router.get('/:matricula/qr', AlumnoController.generarQr);
 
 // Registrar nuevo alumno (solo admin)
 router.post(
