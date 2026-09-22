@@ -8,6 +8,9 @@ const pdfkit_1 = __importDefault(require("pdfkit"));
 const prisma_1 = __importDefault(require("../config/prisma"));
 const env_1 = require("../config/env");
 const date_util_1 = require("../utils/date.util");
+const qr_util_1 = require("../utils/qr.util");
+const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 class ReporteService {
     /**
      * Genera el reporte diario de asistencia en formato PDF usando PDFKit
@@ -179,6 +182,207 @@ class ReporteService {
                 // Línea 2
                 doc.moveTo(350, firmaY).lineTo(520, firmaY).stroke();
                 doc.fillColor('#475569').fontSize(8).font('Helvetica').text('Dirección del Plantel', 350, firmaY + 6, { width: 170, align: 'center' });
+                doc.end();
+            }
+            catch (err) {
+                reject(err);
+            }
+        });
+    }
+    /**
+     * Genera una plantilla en PDF con las credenciales escolares oficiales de todos los alumnos de un grupo,
+     * incluyendo su código QR único correspondiente, dispuestas 4 por hoja (2 columnas x 2 filas) en tamaño CARTA.
+     */
+    static async generarCredencialesGrupoPdf(grupoId) {
+        const grupo = await prisma_1.default.grupo.findUnique({
+            where: { id: grupoId },
+            include: {
+                alumnos: {
+                    where: { activo: true },
+                    orderBy: [
+                        { apellido_paterno: 'asc' },
+                        { apellido_materno: 'asc' },
+                        { nombre: 'asc' },
+                    ],
+                },
+            },
+        });
+        if (!grupo) {
+            throw new Error(`Grupo escolar con ID ${grupoId} no encontrado`);
+        }
+        if (!grupo.alumnos || grupo.alumnos.length === 0) {
+            throw new Error(`El grupo '${grupo.nombre}' no tiene alumnos activos para generar credenciales`);
+        }
+        const logoPath = path_1.default.resolve(__dirname, '../../assets/logo.png');
+        const hasLogo = fs_1.default.existsSync(logoPath);
+        return new Promise(async (resolve, reject) => {
+            try {
+                const doc = new pdfkit_1.default({
+                    margin: 20,
+                    size: 'LETTER', // 612 x 792 pt
+                    autoFirstPage: false,
+                });
+                const buffers = [];
+                doc.on('data', buffers.push.bind(buffers));
+                doc.on('end', () => {
+                    resolve({
+                        buffer: Buffer.concat(buffers),
+                        nombreGrupo: grupo.nombre,
+                        totalAlumnos: grupo.alumnos.length,
+                    });
+                });
+                // Pre-generar buffers QR para cada alumno
+                const alumnosConQr = await Promise.all(grupo.alumnos.map(async (alumno) => {
+                    const qrBuffer = await (0, qr_util_1.generateQrBuffer)(alumno.matricula);
+                    return {
+                        alumno,
+                        qrBuffer,
+                    };
+                }));
+                // Disposición: 4 credenciales por página (2 columnas x 2 filas)
+                const cardWidth = 268;
+                const cardHeight = 168;
+                const startX1 = 28; // Columna izquierda
+                const startX2 = 316; // Columna derecha
+                const startY1 = 48; // Fila superior
+                const startY2 = 236; // Fila inferior
+                const cardsPerPage = 4;
+                const totalPages = Math.ceil(alumnosConQr.length / cardsPerPage);
+                for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+                    doc.addPage({ margin: 20, size: 'LETTER' });
+                    // Encabezado institucional de la hoja
+                    doc.fillColor('#64748b')
+                        .fontSize(7.5)
+                        .font('Helvetica')
+                        .text(`PLANTILLA OFICIAL DE CREDENCIALES • GRUPO: ${grupo.nombre} (${grupo.grado} - TURNO ${grupo.turno.toUpperCase()}) • CICLO ${env_1.config.school.cycle} • PÁGINA ${pageIdx + 1} DE ${totalPages}`, 28, 22, { width: 556, align: 'center' });
+                    // Línea guía superior
+                    doc.strokeColor('#e2e8f0')
+                        .lineWidth(0.5)
+                        .moveTo(28, 34)
+                        .lineTo(584, 34)
+                        .stroke();
+                    const pageAlumnos = alumnosConQr.slice(pageIdx * cardsPerPage, (pageIdx + 1) * cardsPerPage);
+                    for (let slot = 0; slot < pageAlumnos.length; slot++) {
+                        const { alumno, qrBuffer } = pageAlumnos[slot];
+                        const col = slot % 2;
+                        const row = Math.floor(slot / 2);
+                        const x = col === 0 ? startX1 : startX2;
+                        const y = row === 0 ? startY1 : startY2;
+                        // --- GUÍAS DE CORTE EXTERIORES (Líneas punteadas) ---
+                        doc.save();
+                        doc.dash(3, { space: 3 })
+                            .strokeColor('#cbd5e1')
+                            .lineWidth(0.75)
+                            .rect(x - 4, y - 4, cardWidth + 8, cardHeight + 8)
+                            .stroke();
+                        doc.restore();
+                        // Pequeña tijera en esquina superior
+                        doc.fillColor('#94a3b8')
+                            .fontSize(7)
+                            .font('Helvetica')
+                            .text('✂ corte', x - 2, y - 12);
+                        // --- FONDO DE LA TARJETA ---
+                        doc.save();
+                        doc.roundedRect(x, y, cardWidth, cardHeight, 10)
+                            .fillAndStroke('#ffffff', '#94a3b8');
+                        doc.restore();
+                        // Barra lateral izquierda azul institucional
+                        doc.save();
+                        doc.roundedRect(x, y, 6, cardHeight, 3)
+                            .fill('#1d4ed8');
+                        doc.restore();
+                        // --- ENCABEZADO DE LA CREDENCIAL ---
+                        doc.save();
+                        doc.rect(x + 6, y, cardWidth - 6, 32)
+                            .fill('#0f172a');
+                        doc.restore();
+                        // Logo oficial en la tarjeta
+                        if (hasLogo) {
+                            try {
+                                doc.image(logoPath, x + 10, y + 4, { height: 24 });
+                            }
+                            catch { }
+                        }
+                        const headerTextX = hasLogo ? x + 38 : x + 12;
+                        doc.fillColor('#ffffff')
+                            .fontSize(8.5)
+                            .font('Helvetica-Bold')
+                            .text('TELEBACHILLERATO COMUNITARIO', headerTextX, y + 7, { width: cardWidth - 95, ellipsis: true });
+                        doc.fillColor('#93c5fd')
+                            .fontSize(6)
+                            .font('Helvetica')
+                            .text(`CREDENCIAL OFICIAL • CICLO ${env_1.config.school.cycle}`, headerTextX, y + 19);
+                        // Badge 'OFICIAL'
+                        doc.fillColor('#38bdf8')
+                            .fontSize(6.5)
+                            .font('Helvetica-Bold')
+                            .text('OFICIAL', x + cardWidth - 42, y + 11, { width: 36, align: 'right' });
+                        // --- CONTENIDO: COLUMNA IZQUIERDA (QR) ---
+                        const qrBoxX = x + 14;
+                        const qrBoxY = y + 40;
+                        const qrSize = 70;
+                        // Recuadro blanco para el QR
+                        doc.save();
+                        doc.roundedRect(qrBoxX, qrBoxY, qrSize + 8, qrSize + 8, 6)
+                            .fillAndStroke('#f8fafc', '#e2e8f0');
+                        doc.restore();
+                        // Imagen del Código QR correspondiente al alumno
+                        doc.image(qrBuffer, qrBoxX + 4, qrBoxY + 4, { width: qrSize, height: qrSize });
+                        // Matrícula debajo del QR
+                        doc.fillColor('#1d4ed8')
+                            .fontSize(8)
+                            .font('Helvetica-Bold')
+                            .text(alumno.matricula, qrBoxX - 2, qrBoxY + qrSize + 12, { width: qrSize + 12, align: 'center' });
+                        doc.fillColor('#64748b')
+                            .fontSize(5.5)
+                            .font('Helvetica')
+                            .text('MATRÍCULA', qrBoxX - 2, qrBoxY + qrSize + 22, { width: qrSize + 12, align: 'center' });
+                        // --- CONTENIDO: COLUMNA DERECHA (DATOS DEL ALUMNO) ---
+                        const dataX = x + 102;
+                        const dataWidth = cardWidth - 108;
+                        // Nombre
+                        doc.fillColor('#64748b')
+                            .fontSize(5.5)
+                            .font('Helvetica-Bold')
+                            .text('NOMBRE DEL ALUMNO', dataX, y + 40);
+                        const nombreCompleto = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno}`.trim().toUpperCase();
+                        doc.fillColor('#0f172a')
+                            .fontSize(8.5)
+                            .font('Helvetica-Bold')
+                            .text(nombreCompleto, dataX, y + 49, { width: dataWidth, lineGap: 1 });
+                        // Línea separadora tenue
+                        doc.strokeColor('#e2e8f0')
+                            .lineWidth(0.5)
+                            .moveTo(dataX, y + 78)
+                            .lineTo(x + cardWidth - 10, y + 78)
+                            .stroke();
+                        // Grupo y Turno
+                        doc.fillColor('#64748b').fontSize(5.5).font('Helvetica-Bold').text('GRUPO', dataX, y + 84);
+                        doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text(grupo.nombre, dataX, y + 92);
+                        doc.fillColor('#64748b').fontSize(5.5).font('Helvetica-Bold').text('TURNO', dataX + 50, y + 84);
+                        doc.fillColor('#0f172a').fontSize(8).font('Helvetica-Bold').text(grupo.turno.toUpperCase(), dataX + 50, y + 92);
+                        doc.fillColor('#64748b').fontSize(5.5).font('Helvetica-Bold').text('VIGENCIA', dataX + 100, y + 84);
+                        doc.fillColor('#2563eb').fontSize(7.5).font('Helvetica-Bold').text('JULIO 2027', dataX + 100, y + 92);
+                        // Nota institucional al pie de la credencial
+                        doc.fillColor('#94a3b8')
+                            .fontSize(5)
+                            .font('Helvetica')
+                            .text('Válida para el registro automatizado de asistencia escolar.', dataX, y + 118, { width: dataWidth });
+                        // Sello de autorización
+                        doc.save();
+                        doc.roundedRect(dataX, y + 132, 68, 14, 3)
+                            .fillAndStroke('#ecfdf5', '#a7f3d0');
+                        doc.restore();
+                        doc.fillColor('#065f46')
+                            .fontSize(6)
+                            .font('Helvetica-Bold')
+                            .text('✓ AUTORIZADO', dataX + 8, y + 136);
+                        doc.fillColor('#64748b')
+                            .fontSize(5)
+                            .font('Helvetica')
+                            .text(`PREPA-QR ${env_1.config.school.cycle}`, x + cardWidth - 62, y + 138, { width: 52, align: 'right' });
+                    }
+                }
                 doc.end();
             }
             catch (err) {

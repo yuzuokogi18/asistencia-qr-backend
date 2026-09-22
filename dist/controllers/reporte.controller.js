@@ -22,6 +22,23 @@ class ReporteController {
             return (0, response_util_1.sendError)(res, error.message, 500);
         }
     }
+    static async getCredencialesGrupoPdf(req, res, next) {
+        try {
+            const grupoId = parseInt(req.params.id, 10);
+            if (isNaN(grupoId)) {
+                return (0, response_util_1.sendError)(res, 'ID de grupo inválido', 400);
+            }
+            const { buffer, nombreGrupo } = await reporte_service_1.ReporteService.generarCredencialesGrupoPdf(grupoId);
+            const filename = `Credenciales_Grupo_${nombreGrupo.replace(/\s+/g, '_')}.pdf`;
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', buffer.length);
+            return res.send(buffer);
+        }
+        catch (error) {
+            return (0, response_util_1.sendError)(res, error.message, 400);
+        }
+    }
 }
 exports.ReporteController = ReporteController;
 //# sourceMappingURL=reporte.controller.js.map
