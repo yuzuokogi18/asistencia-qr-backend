@@ -1,0 +1,16 @@
+name: Keep Render API Awake 24/7
+
+on:
+  schedule:
+    # Ejecutar cada 10 minutos (Render duerme a los 15 minutos de inactividad)
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API Health
+        run: |
+          echo "Pinging Render API..."
+          curl -s -f https://asistencia-qr-backend-iw6h.onrender.com/api/health || true
