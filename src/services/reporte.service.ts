@@ -407,61 +407,55 @@ export class ReporteService {
             doc.fillColor('#64748b')
               .fontSize(5)
               .font('Helvetica-Bold')
-              .text('FOTO INFANTIL', photoX, photoY + 37, { width: photoW, align: 'center' });
+              .text('FOTO INFANTIL', photoX, photoY + 39, { width: photoW, align: 'center' });
 
             doc.fillColor('#94a3b8')
               .fontSize(4)
               .font('Helvetica')
-              .text('2.5 × 3.0 CM', photoX, photoY + 45, { width: photoW, align: 'center' });
+              .text('2.5 × 3.0 CM', photoX, photoY + 47, { width: photoW, align: 'center' });
 
-            // Badge alumno activo
-            doc.fillColor('#059669')
-              .fontSize(4.5)
-              .font('Helvetica-Bold')
-              .text('● ALUMNO(A) ACTIVO(A)', x, photoY + photoH + 2, { width: cardWidth, align: 'center' });
-
-            // --- 2. DATOS DEL ALUMNO (CENTRO: y + 102 a y + 154) ---
+            // --- 2. DATOS DEL ALUMNO (CENTRO: y + 104 a y + 156) ---
             const nombreCompleto = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno}`.trim().toUpperCase();
 
             doc.fillColor('#64748b')
               .fontSize(4.5)
               .font('Helvetica-Bold')
-              .text('NOMBRE DEL ALUMNO', x + 6, y + 102, { width: cardWidth - 12, align: 'center' });
+              .text('NOMBRE DEL ALUMNO', x + 6, y + 104, { width: cardWidth - 12, align: 'center' });
 
             doc.fillColor('#0f172a')
-              .fontSize(7)
+              .fontSize(7.5)
               .font('Helvetica-Bold')
-              .text(nombreCompleto, x + 6, y + 108, { width: cardWidth - 12, align: 'center', height: 16, ellipsis: true });
+              .text(nombreCompleto, x + 6, y + 110, { width: cardWidth - 12, align: 'center', height: 16, ellipsis: true });
 
             // Línea separadora
             doc.strokeColor('#e2e8f0')
               .lineWidth(0.5)
-              .moveTo(x + 16, y + 125)
-              .lineTo(x + cardWidth - 16, y + 125)
+              .moveTo(x + 16, y + 128)
+              .lineTo(x + cardWidth - 16, y + 128)
               .stroke();
 
             // Matrícula
             doc.fillColor('#1d4ed8')
-              .fontSize(7.5)
+              .fontSize(8)
               .font('Helvetica-Bold')
-              .text(alumno.matricula, x, y + 128, { width: cardWidth, align: 'center' });
+              .text(alumno.matricula, x, y + 131, { width: cardWidth, align: 'center' });
 
             // Grupo y Turno
             doc.fillColor('#334155')
               .fontSize(5.5)
               .font('Helvetica-Bold')
-              .text(`GRUPO: ${grupo.nombre}  •  ${grupo.turno.toUpperCase()}`, x, y + 138, { width: cardWidth, align: 'center' });
+              .text(`GRUPO: ${grupo.nombre}  •  ${grupo.turno.toUpperCase()}`, x, y + 142, { width: cardWidth, align: 'center' });
 
             // Vigencia y Ciclo
             doc.fillColor('#64748b')
               .fontSize(4.5)
               .font('Helvetica')
-              .text(`CICLO: ${config.school.cycle}  •  VIGENCIA: JULIO 2027`, x, y + 146, { width: cardWidth, align: 'center' });
+              .text(`CICLO: ${config.school.cycle}  •  VIGENCIA: JULIO 2027`, x, y + 151, { width: cardWidth, align: 'center' });
 
-            // --- 3. CÓDIGO QR DE ACCESO (CENTRO ABAJO: y + 154 a y + 212) ---
-            const qrSize = 52;
+            // --- 3. CÓDIGO QR DE ACCESO (CENTRO ABAJO: y + 160 a y + 224) ---
+            const qrSize = 56;
             const qrX = x + Math.round((cardWidth - qrSize) / 2);
-            const qrY = y + 154;
+            const qrY = y + 160;
 
             // Recuadro blanco para el QR
             doc.save();
@@ -474,24 +468,13 @@ export class ReporteService {
 
             // Texto debajo del QR
             doc.fillColor('#64748b')
-              .fontSize(4.5)
-              .font('Helvetica-Bold')
-              .text('ACCESO ESCOLAR PREPA-QR', x, qrY + qrSize + 5, { width: cardWidth, align: 'center' });
-
-            // Sello de autorización oficial
-            doc.save();
-            doc.roundedRect(x + (cardWidth - 66) / 2, y + 224, 66, 11, 2)
-              .fillAndStroke('#ecfdf5', '#a7f3d0');
-            doc.restore();
-
-            doc.fillColor('#065f46')
               .fontSize(5)
               .font('Helvetica-Bold')
-              .text('✓ OFICIAL AUTORIZADO', x, y + 227, { width: cardWidth, align: 'center' });
+              .text('ACCESO ESCOLAR PREPA-QR', x, qrY + qrSize + 6, { width: cardWidth, align: 'center' });
 
             // Barra inferior decorativa
             doc.save();
-            doc.rect(x, y + cardHeight - 2, cardWidth, 2)
+            doc.rect(x, y + cardHeight - 2.5, cardWidth, 2.5)
               .fill('#2563eb');
             doc.restore();
           }
