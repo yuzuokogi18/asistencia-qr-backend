@@ -239,203 +239,188 @@ class ReporteService {
                         qrBuffer,
                     };
                 }));
-                // Disposición: 4 credenciales por página (2 columnas x 2 filas)
-                const cardWidth = 268;
-                const cardHeight = 168;
-                const startX1 = 28; // Columna izquierda
-                const startX2 = 316; // Columna derecha
-                const startY1 = 48; // Fila superior
-                const startY2 = 236; // Fila inferior
-                const cardsPerPage = 4;
+                // Medida exacta estándar ID-1 vertical: 54 mm x 85 mm (para portagafete Indra IND-0391)
+                // 1 mm = 72 / 25.4 pt ≈ 2.8346 pt
+                // Ancho: 54 mm ≈ 153 pt
+                // Alto: 85 mm ≈ 241 pt
+                const cardWidth = 153;
+                const cardHeight = 241;
+                // Disposición: 6 credenciales por página en hoja Carta (3 columnas x 2 filas)
+                // Hoja Carta: 612 pt de ancho x 792 pt de alto
+                // Columnas: x0 = 39, x1 = 229, x2 = 420
+                // Filas: y0 = 55, y1 = 345
+                const startXCoords = [39, 229, 420];
+                const startYCoords = [55, 345];
+                const cardsPerPage = 6;
                 const totalPages = Math.ceil(alumnosConQr.length / cardsPerPage);
                 for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
-                    doc.addPage({ margin: 20, size: 'LETTER' });
+                    doc.addPage({ margin: 15, size: 'LETTER' });
                     // Encabezado institucional de la hoja
                     doc.fillColor('#64748b')
                         .fontSize(7.5)
                         .font('Helvetica')
-                        .text(`PLANTILLA OFICIAL DE CREDENCIALES • GRUPO: ${grupo.nombre} (${grupo.grado} - TURNO ${grupo.turno.toUpperCase()}) • CICLO ${env_1.config.school.cycle} • PÁGINA ${pageIdx + 1} DE ${totalPages}`, 28, 22, { width: 556, align: 'center' });
+                        .text(`PLANTILLA OFICIAL DE CREDENCIALES (54 × 85 mm) • GRUPO: ${grupo.nombre} (${grupo.grado} - TURNO ${grupo.turno.toUpperCase()}) • CICLO ${env_1.config.school.cycle} • PÁG. ${pageIdx + 1} DE ${totalPages}`, 20, 22, { width: 572, align: 'center' });
                     // Línea guía superior
                     doc.strokeColor('#e2e8f0')
                         .lineWidth(0.5)
-                        .moveTo(28, 34)
-                        .lineTo(584, 34)
+                        .moveTo(20, 36)
+                        .lineTo(592, 36)
                         .stroke();
                     const pageAlumnos = alumnosConQr.slice(pageIdx * cardsPerPage, (pageIdx + 1) * cardsPerPage);
                     for (let slot = 0; slot < pageAlumnos.length; slot++) {
                         const { alumno, qrBuffer } = pageAlumnos[slot];
-                        const col = slot % 2;
-                        const row = Math.floor(slot / 2);
-                        const x = col === 0 ? startX1 : startX2;
-                        const y = row === 0 ? startY1 : startY2;
+                        const col = slot % 3;
+                        const row = Math.floor(slot / 3);
+                        const x = startXCoords[col];
+                        const y = startYCoords[row];
                         // --- GUÍAS DE CORTE EXTERIORES (Líneas punteadas) ---
                         doc.save();
                         doc.dash(3, { space: 3 })
-                            .strokeColor('#cbd5e1')
-                            .lineWidth(0.75)
-                            .rect(x - 4, y - 4, cardWidth + 8, cardHeight + 8)
+                            .strokeColor('#94a3b8')
+                            .lineWidth(0.6)
+                            .rect(x - 3, y - 3, cardWidth + 6, cardHeight + 6)
                             .stroke();
                         doc.restore();
                         // Pequeña tijera en esquina superior
-                        doc.fillColor('#94a3b8')
-                            .fontSize(7)
+                        doc.fillColor('#64748b')
+                            .fontSize(6)
                             .font('Helvetica')
-                            .text('✂ corte', x - 2, y - 12);
+                            .text('✂ corte 54x85mm', x - 2, y - 11);
                         // --- FONDO DE LA TARJETA ---
                         doc.save();
-                        doc.roundedRect(x, y, cardWidth, cardHeight, 10)
-                            .fillAndStroke('#ffffff', '#94a3b8');
+                        doc.roundedRect(x, y, cardWidth, cardHeight, 6)
+                            .fillAndStroke('#ffffff', '#cbd5e1');
                         doc.restore();
-                        // Barra lateral izquierda azul institucional
+                        // --- ENCABEZADO INSTITUCIONAL DE LA TARJETA (y a y + 30) ---
                         doc.save();
-                        doc.roundedRect(x, y, 6, cardHeight, 3)
-                            .fill('#1d4ed8');
-                        doc.restore();
-                        // --- ENCABEZADO DE LA CREDENCIAL ---
-                        doc.save();
-                        doc.rect(x + 6, y, cardWidth - 6, 32)
+                        doc.roundedRect(x, y, cardWidth, 30, 6)
                             .fill('#0f172a');
+                        // Rectángulo plano para cubrir esquinas inferiores del encabezado
+                        doc.rect(x, y + 20, cardWidth, 10)
+                            .fill('#0f172a');
+                        // Línea acento azul inferior
+                        doc.rect(x, y + 29, cardWidth, 1.5)
+                            .fill('#2563eb');
                         doc.restore();
                         // Logo oficial en la tarjeta
                         if (hasLogo) {
                             try {
-                                doc.image(logoPath, x + 10, y + 4, { height: 24 });
+                                doc.image(logoPath, x + 6, y + 3, { height: 23 });
                             }
                             catch { }
                         }
-                        const headerTextX = hasLogo ? x + 38 : x + 12;
+                        const headerTextX = hasLogo ? x + 33 : x + 8;
+                        const headerTextW = cardWidth - (headerTextX - x) - 6;
                         doc.fillColor('#ffffff')
-                            .fontSize(8.5)
+                            .fontSize(5.5)
                             .font('Helvetica-Bold')
-                            .text('TELEBACHILLERATO COMUNITARIO', headerTextX, y + 7, { width: cardWidth - 95, ellipsis: true });
-                        doc.fillColor('#93c5fd')
-                            .fontSize(6)
+                            .text('TELEBACHILLERATO', headerTextX, y + 5, { width: headerTextW, ellipsis: true });
+                        doc.fillColor('#cbd5e1')
+                            .fontSize(4.5)
                             .font('Helvetica')
-                            .text(`CREDENCIAL OFICIAL • CICLO ${env_1.config.school.cycle}`, headerTextX, y + 19);
-                        // Badge 'OFICIAL'
+                            .text('COMUNITARIO', headerTextX, y + 13, { width: headerTextW });
                         doc.fillColor('#38bdf8')
-                            .fontSize(6.5)
+                            .fontSize(4.5)
                             .font('Helvetica-Bold')
-                            .text('OFICIAL', x + cardWidth - 42, y + 11, { width: 36, align: 'right' });
-                        // --- CONTENIDO: 3 COLUMNAS (FOTO | DATOS | QR) ---
-                        // 1. RECUADRO PARA FOTO INFANTIL (IZQUIERDA)
-                        const photoX = x + 12;
-                        const photoY = y + 38;
-                        const photoW = 54;
-                        const photoH = 68;
-                        // Marco con borde para foto infantil oficial (2.5 x 3.0 cm aprox)
+                            .text(`CREDENCIAL • ${env_1.config.school.cycle}`, headerTextX, y + 21, { width: headerTextW });
+                        // --- 1. ESPACIO PARA FOTO INFANTIL (CENTRO ARRIBA: y + 35 a y + 95) ---
+                        const photoW = 46;
+                        const photoH = 58;
+                        const photoX = x + Math.round((cardWidth - photoW) / 2);
+                        const photoY = y + 35;
+                        // Marco para foto con borde punteado
                         doc.save();
                         doc.roundedRect(photoX, photoY, photoW, photoH, 4)
                             .fillAndStroke('#f8fafc', '#cbd5e1');
                         doc.dash(2, { space: 2 })
                             .roundedRect(photoX + 1.5, photoY + 1.5, photoW - 3, photoH - 3, 3)
                             .strokeColor('#94a3b8')
-                            .lineWidth(0.6)
+                            .lineWidth(0.5)
                             .stroke();
                         doc.restore();
-                        // Silueta esquemática de alumno (cabeza y hombros)
+                        // Silueta esquemática vectorial de alumno
                         doc.save();
                         doc.fillColor('#e2e8f0');
                         // Cabeza
-                        doc.circle(photoX + photoW / 2, photoY + 23, 9).fill();
+                        doc.circle(photoX + photoW / 2, photoY + 19, 7.5).fill();
                         // Hombros
-                        doc.path(`M ${photoX + 12} ${photoY + 52} Q ${photoX + photoW / 2} ${photoY + 38} ${photoX + photoW - 12} ${photoY + 52} L ${photoX + photoW - 12} ${photoY + 56} L ${photoX + 12} ${photoY + 56} Z`).fill();
+                        doc.path(`M ${photoX + 9} ${photoY + 44} Q ${photoX + photoW / 2} ${photoY + 31} ${photoX + photoW - 9} ${photoY + 44} L ${photoX + photoW - 9} ${photoY + 48} L ${photoX + 9} ${photoY + 48} Z`).fill();
                         doc.restore();
-                        // Texto indicativo centrado
+                        // Leyendas dentro del marco de foto
                         doc.fillColor('#64748b')
-                            .fontSize(5.5)
-                            .font('Helvetica-Bold')
-                            .text('ESPACIO FOTO', photoX, photoY + 44, { width: photoW, align: 'center' });
-                        doc.fillColor('#94a3b8')
-                            .fontSize(4.5)
-                            .font('Helvetica')
-                            .text('TAMAÑO INFANTIL', photoX, photoY + 52, { width: photoW, align: 'center' });
-                        // Etiqueta debajo del marco de foto
-                        doc.save();
-                        doc.roundedRect(photoX, photoY + photoH + 5, photoW, 14, 3)
-                            .fillAndStroke('#f1f5f9', '#e2e8f0');
-                        doc.restore();
-                        doc.fillColor('#334155')
                             .fontSize(5)
                             .font('Helvetica-Bold')
-                            .text('ALUMNO(A)', photoX, photoY + photoH + 7, { width: photoW, align: 'center' });
+                            .text('FOTO INFANTIL', photoX, photoY + 37, { width: photoW, align: 'center' });
+                        doc.fillColor('#94a3b8')
+                            .fontSize(4)
+                            .font('Helvetica')
+                            .text('2.5 × 3.0 CM', photoX, photoY + 45, { width: photoW, align: 'center' });
+                        // Badge alumno activo
                         doc.fillColor('#059669')
                             .fontSize(4.5)
                             .font('Helvetica-Bold')
-                            .text('● ACTIVO', photoX, photoY + photoH + 13, { width: photoW, align: 'center' });
-                        // 2. DATOS DEL ALUMNO (CENTRO)
-                        const dataX = x + 72;
-                        const dataWidth = 118;
-                        doc.fillColor('#64748b')
-                            .fontSize(5)
-                            .font('Helvetica-Bold')
-                            .text('NOMBRE DEL ALUMNO', dataX, y + 38);
+                            .text('● ALUMNO(A) ACTIVO(A)', x, photoY + photoH + 2, { width: cardWidth, align: 'center' });
+                        // --- 2. DATOS DEL ALUMNO (CENTRO: y + 102 a y + 154) ---
                         const nombreCompleto = `${alumno.nombre} ${alumno.apellido_paterno} ${alumno.apellido_materno}`.trim().toUpperCase();
-                        doc.fillColor('#0f172a')
-                            .fontSize(8)
+                        doc.fillColor('#64748b')
+                            .fontSize(4.5)
                             .font('Helvetica-Bold')
-                            .text(nombreCompleto, dataX, y + 46, { width: dataWidth, lineGap: 1, height: 22, ellipsis: true });
+                            .text('NOMBRE DEL ALUMNO', x + 6, y + 102, { width: cardWidth - 12, align: 'center' });
+                        doc.fillColor('#0f172a')
+                            .fontSize(7)
+                            .font('Helvetica-Bold')
+                            .text(nombreCompleto, x + 6, y + 108, { width: cardWidth - 12, align: 'center', height: 16, ellipsis: true });
                         // Línea separadora
                         doc.strokeColor('#e2e8f0')
                             .lineWidth(0.5)
-                            .moveTo(dataX, y + 70)
-                            .lineTo(dataX + dataWidth, y + 70)
+                            .moveTo(x + 16, y + 125)
+                            .lineTo(x + cardWidth - 16, y + 125)
                             .stroke();
                         // Matrícula
-                        doc.fillColor('#64748b').fontSize(5).font('Helvetica-Bold').text('MATRÍCULA', dataX, y + 74);
-                        doc.fillColor('#1d4ed8').fontSize(7.5).font('Helvetica-Bold').text(alumno.matricula, dataX, y + 81);
+                        doc.fillColor('#1d4ed8')
+                            .fontSize(7.5)
+                            .font('Helvetica-Bold')
+                            .text(alumno.matricula, x, y + 128, { width: cardWidth, align: 'center' });
                         // Grupo y Turno
-                        doc.fillColor('#64748b').fontSize(5).font('Helvetica-Bold').text('GRUPO', dataX, y + 93);
-                        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold').text(grupo.nombre, dataX, y + 100);
-                        doc.fillColor('#64748b').fontSize(5).font('Helvetica-Bold').text('TURNO', dataX + 54, y + 93);
-                        doc.fillColor('#0f172a').fontSize(7.5).font('Helvetica-Bold').text(grupo.turno.toUpperCase(), dataX + 54, y + 100);
-                        // Vigencia y Ciclo
-                        doc.fillColor('#64748b').fontSize(5).font('Helvetica-Bold').text('VIGENCIA', dataX, y + 112);
-                        doc.fillColor('#2563eb').fontSize(7).font('Helvetica-Bold').text('JULIO 2027', dataX, y + 119);
-                        doc.fillColor('#64748b').fontSize(5).font('Helvetica-Bold').text('CICLO', dataX + 54, y + 112);
-                        doc.fillColor('#0f172a').fontSize(7).font('Helvetica-Bold').text(env_1.config.school.cycle, dataX + 54, y + 119);
-                        // Badge de autorización oficial
-                        doc.save();
-                        doc.roundedRect(dataX, y + 133, 62, 13, 3)
-                            .fillAndStroke('#ecfdf5', '#a7f3d0');
-                        doc.restore();
-                        doc.fillColor('#065f46')
+                        doc.fillColor('#334155')
                             .fontSize(5.5)
                             .font('Helvetica-Bold')
-                            .text('✓ AUTORIZADO', dataX + 5, y + 137);
+                            .text(`GRUPO: ${grupo.nombre}  •  ${grupo.turno.toUpperCase()}`, x, y + 138, { width: cardWidth, align: 'center' });
+                        // Vigencia y Ciclo
                         doc.fillColor('#64748b')
                             .fontSize(4.5)
                             .font('Helvetica')
-                            .text('OFICIAL SEP', dataX + 70, y + 138);
-                        // 3. CÓDIGO QR DE ACCESO (DERECHA)
-                        const qrBoxX = x + 196;
-                        const qrBoxY = y + 38;
-                        const qrSize = 58;
+                            .text(`CICLO: ${env_1.config.school.cycle}  •  VIGENCIA: JULIO 2027`, x, y + 146, { width: cardWidth, align: 'center' });
+                        // --- 3. CÓDIGO QR DE ACCESO (CENTRO ABAJO: y + 154 a y + 212) ---
+                        const qrSize = 52;
+                        const qrX = x + Math.round((cardWidth - qrSize) / 2);
+                        const qrY = y + 154;
                         // Recuadro blanco para el QR
                         doc.save();
-                        doc.roundedRect(qrBoxX, qrBoxY, qrSize + 4, qrSize + 4, 5)
+                        doc.roundedRect(qrX - 2.5, qrY - 2.5, qrSize + 5, qrSize + 5, 4)
                             .fillAndStroke('#ffffff', '#e2e8f0');
                         doc.restore();
-                        // Imagen del Código QR correspondiente al alumno
-                        doc.image(qrBuffer, qrBoxX + 2, qrBoxY + 2, { width: qrSize, height: qrSize });
-                        // Matrícula debajo del QR
-                        doc.fillColor('#1d4ed8')
-                            .fontSize(7)
-                            .font('Helvetica-Bold')
-                            .text(alumno.matricula, qrBoxX - 4, qrBoxY + qrSize + 8, { width: qrSize + 12, align: 'center' });
+                        // Imagen del QR
+                        doc.image(qrBuffer, qrX, qrY, { width: qrSize, height: qrSize });
+                        // Texto debajo del QR
                         doc.fillColor('#64748b')
-                            .fontSize(5)
-                            .font('Helvetica')
-                            .text('ACCESO ESCOLAR', qrBoxX - 4, qrBoxY + qrSize + 17, { width: qrSize + 12, align: 'center' });
-                        // Badge KIOSKO QR
+                            .fontSize(4.5)
+                            .font('Helvetica-Bold')
+                            .text('ACCESO ESCOLAR PREPA-QR', x, qrY + qrSize + 5, { width: cardWidth, align: 'center' });
+                        // Sello de autorización oficial
                         doc.save();
-                        doc.roundedRect(qrBoxX, y + 133, qrSize + 4, 13, 3)
-                            .fillAndStroke('#eff6ff', '#bfdbfe');
+                        doc.roundedRect(x + (cardWidth - 66) / 2, y + 224, 66, 11, 2)
+                            .fillAndStroke('#ecfdf5', '#a7f3d0');
                         doc.restore();
-                        doc.fillColor('#1d4ed8')
+                        doc.fillColor('#065f46')
                             .fontSize(5)
                             .font('Helvetica-Bold')
-                            .text('KIOSKO QR', qrBoxX, y + 137, { width: qrSize + 4, align: 'center' });
+                            .text('✓ OFICIAL AUTORIZADO', x, y + 227, { width: cardWidth, align: 'center' });
+                        // Barra inferior decorativa
+                        doc.save();
+                        doc.rect(x, y + cardHeight - 2, cardWidth, 2)
+                            .fill('#2563eb');
+                        doc.restore();
                     }
                 }
                 doc.end();
